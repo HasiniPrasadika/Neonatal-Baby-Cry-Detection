@@ -1,0 +1,21 @@
+# Virtual environment
+venv/
+baby_cry_env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Model files (optional if you don't want to push them)
+*.pkl
+
+# System files
+.DS_Store
+*.log
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# Streamlit cache
+.streamlit/
