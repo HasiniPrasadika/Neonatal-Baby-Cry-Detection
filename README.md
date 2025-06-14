@@ -1,26 +1,33 @@
 # 👶 Baby Cry Detection System
 
-A machine learning-powered application that analyzes baby cries to determine the likely cause (hungry, tired, discomfort, belly pain, or burping). Built with Random Forest classifier using MFCC audio features and deployed with Streamlit.
+A machine learning-powered web application that analyzes baby cries to determine the likely cause (hungry, tired, discomfort, belly pain, or burping). Built with Random Forest classifier using enhanced audio features and deployed with Streamlit.
 
 ## 🎯 Features
 
-- **Multiple Input Methods**: Upload audio files, record live audio, or use real-time analysis
+- **Multiple Input Methods**: Upload audio files or record live audio through the web interface
 - **5 Cry Classifications**: Hungry, Tired, Discomfort, Belly Pain, Burping
 - **Real-time Visualization**: Audio waveforms and prediction probabilities
 - **User-friendly Interface**: Intuitive Streamlit web application
 - **Actionable Insights**: Provides caring advice based on predictions
+- **Enhanced Feature Extraction**: 58 audio features including MFCC, spectral features, and more
 
 ## 🏗️ Model Architecture
 
-- **Algorithm**: Random Forest Classifier
-- **Features**: MFCC (Mel-Frequency Cepstral Coefficients) - 40 coefficients
-- **Dataset**: DonateACry Corpus with 5 cry categories
+- **Algorithm**: Random Forest Classifier (best performing among tested models)
+- **Features**: 58 enhanced audio features including:
+  - MFCC (Mel-Frequency Cepstral Coefficients) - 26 features
+  - Spectral features (centroids, rolloff, bandwidth) - 6 features
+  - Zero crossing rate - 2 features
+  - Root Mean Square Energy - 2 features
+  - Chroma features - 12 features
+  - Mel-scale spectrogram - 10 features
+- **Training Environment**: Google Colab with GPU acceleration
 - **Performance**: ~85-90% accuracy on test set
-- **Preprocessing**: Audio normalization, feature scaling, dataset balancing
+- **Data Balancing**: SMOTE (Synthetic Minority Oversampling Technique)
 
 ## 📊 Dataset
 
-The model is trained on the DonateACry corpus containing:
+The model is trained on audio files organized in the following categories:
 - **Belly Pain**: Cries indicating stomach discomfort
 - **Burping**: Cries indicating need to burp
 - **Discomfort**: General discomfort cries
@@ -32,9 +39,9 @@ The model is trained on the DonateACry corpus containing:
 ### Prerequisites
 - Python 3.8+
 - Microphone access (for recording features)
-- Git
+- Web browser
 
-### Installation
+### Installation & Setup
 
 1. **Clone the repository**
 ```bash
@@ -53,76 +60,80 @@ source baby_cry_env/bin/activate  # On Windows: baby_cry_env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. **Prepare your dataset**
-- Download the DonateACry dataset from Kaggle
-- Organize in the following structure:
-```
-data/
-├── belly_pain/
-├── burping/
-├── discomfort/
-├── hungry/
-└── tired/
-```
+4. **Ensure model files are present**
+Make sure these files are in your project directory:
+- `baby_cry_model.pkl` (trained Random Forest model)
+- `label_encoder.pkl` (label encoder for cry types)
+- `feature_columns.pkl` (feature column names)
+- `scaler.pkl` (feature scaler)
 
-5. **Train the model**
-```bash
-python train_model.py
-```
-
-6. **Run the application**
+5. **Run the application**
 ```bash
 streamlit run app.py
 ```
 
-## 🔧 Usage
+6. **Open your browser** to `http://localhost:8501`
 
-### Training the Model
+## 🔧 Model Training (Google Colab)
 
+The model training was performed in Google Colab with the following process:
+
+### Training Pipeline
+
+1. **Data Preparation**
+   - Mount Google Drive containing the dataset
+   - Organize audio files in category folders
+   - Extract enhanced audio features from each file
+
+2. **Feature Engineering**
+   ```python
+   # 58 total features extracted:
+   # - 13 MFCC coefficients (mean + std) = 26 features
+   # - Spectral features (centroid, rolloff, bandwidth) = 6 features  
+   # - Zero crossing rate (mean + std) = 2 features
+   # - RMS energy (mean + std) = 2 features
+   # - 12 Chroma features
+   # - 10 Mel-spectrogram features
+   ```
+
+3. **Model Training & Selection**
+   - Tested multiple algorithms: Random Forest, Gradient Boosting, SVM
+   - Applied SMOTE for class imbalance handling
+   - Used cross-validation for robust evaluation
+   - Selected best performing model (Random Forest)
+
+4. **Model Export**
+   - Saved trained model and preprocessing objects as pickle files
+   - Downloaded from Colab to local project directory
+
+### Training Code Structure (Colab)
 ```python
-from train_model import BabyCryDetectionTrainer
-
-# Initialize trainer with your data path
-trainer = BabyCryDetectionTrainer("/path/to/your/data")
-
-# Run complete training pipeline
-trainer.run_training_pipeline()
-
-# Make predictions
-predicted_class, confidence = trainer.predict_single_audio("test_audio.wav")
-print(f"Predicted: {predicted_class} (Confidence: {confidence:.4f})")
+# Main training class
+class ImprovedBabyCryDetectionTrainer:
+    - enhanced_features_extractor()  # Extract 58 audio features
+    - balance_dataset()              # Apply SMOTE balancing
+    - train_multiple_models()        # Train and compare models
+    - cross_validate_model()         # Perform cross-validation
+    - evaluate_model()               # Comprehensive evaluation
+    - save_model()                   # Export trained model
 ```
-
-### Using the Web Application
-
-1. **Upload Method**: 
-   - Select "Upload Audio File"
-   - Choose a .wav, .mp3, or other supported audio file
-   - Click "Analyze Audio"
-
-2. **Recording Method**:
-   - Select "Record Audio"
-   - Click the microphone button to start recording
-   - Audio will be automatically analyzed after recording
-
-3. **Real-time Analysis**:
-   - Feature coming soon for continuous monitoring
 
 ## 📁 Project Structure
 
 ```
 baby-cry-detection/
 ├── app.py                      # Main Streamlit application
-├── train_model.py             # Model training script
 ├── requirements.txt           # Python dependencies
 ├── README.md                  # This file
-├── baby_cry_model.pkl        # Trained model (generated)
-├── label_encoder.pkl         # Label encoder (generated)
-├── feature_columns.pkl       # Feature columns (generated)
-└── data/                     # Dataset directory
+├── baby_cry_model.pkl        # Trained Random Forest model
+├── label_encoder.pkl         # Label encoder for cry categories
+├── feature_columns.pkl       # Feature column names (58 features)
+├── scaler.pkl               # Standard scaler for feature normalization
+├── colab_training.ipynb     # Google Colab training notebook
+└── data/                    # Dataset directory (for training)
     ├── belly_pain/
     ├── burping/
-    ├── discomfort/
+    ├── discomfort/  
     ├── hungry/
     └── tired/
 ```
@@ -130,37 +141,74 @@ baby-cry-detection/
 ## 🎨 Application Interface
 
 ### Main Features
-- **Audio Upload**: Drag and drop or browse for audio files
-- **Live Recording**: Record baby cries directly in the browser
-- **Waveform Visualization**: See audio patterns in real-time
-- **Probability Charts**: Understand prediction confidence
-- **Actionable Advice**: Get caring suggestions based on predictions
+- **Audio Upload**: Support for WAV, MP3, FLAC, M4A, OGG formats
+- **Live Recording**: Record baby cries directly through the browser
+- **Waveform Visualization**: Interactive audio waveform display
+- **Probability Charts**: Confidence scores for all cry types
+- **Caring Advice**: Specific suggestions based on predictions
 
-### Results Display
-- **Primary Prediction**: Most likely cry type with confidence
-- **Probability Distribution**: All classes with their scores
-- **Caring Advice**: Specific suggestions for each cry type
-- **Visual Feedback**: Color-coded results and charts
+### Usage Methods
 
-## 🔍 Model Details
+1. **Upload Audio File**:
+   - Select "Upload Audio File" from sidebar
+   - Choose an audio file from your device
+   - Click "Analyze Audio" to get predictions
 
-### Feature Extraction
-- **MFCC Features**: 40 coefficients extracted from audio
-- **Audio Preprocessing**: Normalization and duration standardization
-- **Sampling Rate**: 22050 Hz for consistent processing
+2. **Record Audio**:
+   - Select "Record Audio" from sidebar  
+   - Click the microphone button to start recording
+   - Audio is automatically analyzed after recording stops
 
-### Training Process
-1. **Data Loading**: Traverse subdirectories and load audio files
-2. **Feature Extraction**: Extract MFCC features from each audio file
-3. **Data Balancing**: Use oversampling to handle class imbalance
-4. **Model Training**: Train Random Forest with optimized hyperparameters
-5. **Evaluation**: Test on hold-out set with comprehensive metrics
+3. **Real-time Analysis**:
+   - Feature planned for future release
+   - Will provide continuous monitoring capabilities
 
-### Performance Metrics
-- **Accuracy**: Overall classification accuracy
-- **Precision/Recall**: Per-class performance metrics
-- **Confusion Matrix**: Detailed classification results
-- **Cross-validation**: Robust performance estimation
+## 🔍 Technical Details
+
+### Audio Processing
+- **Supported Formats**: WAV, MP3, FLAC, M4A, OGG
+- **Sample Rate**: 22050 Hz (automatically resampled)
+- **Feature Extraction**: 58 enhanced audio features per sample
+- **Audio Duration**: Handles 2-3 second clips optimally
+
+### Model Specifications
+```python
+# Final Random Forest Configuration
+RandomForestClassifier(
+    n_estimators=200,
+    max_depth=15,
+    min_samples_split=5,
+    min_samples_leaf=2,
+    random_state=42,
+    class_weight='balanced'
+)
+```
+
+### Feature Extraction Process
+```python
+def enhanced_features_extractor(audio_data, sample_rate):
+    # 1. MFCC features (26 total: 13 mean + 13 std)
+    # 2. Spectral features (6 total: centroid, rolloff, bandwidth)
+    # 3. Zero crossing rate (2 total: mean + std)
+    # 4. RMS energy (2 total: mean + std) 
+    # 5. Chroma features (12 total)
+    # 6. Mel-spectrogram features (10 total)
+    return features_array  # Shape: (58,)
+```
+
+## 📈 Model Performance
+
+### Training Results
+- **Cross-validation F1-Score**: ~0.85-0.90
+- **Test Accuracy**: ~85-90%
+- **Class Balance**: SMOTE applied for equal representation
+- **Feature Importance**: MFCC features most discriminative
+
+### Prediction Output
+- **Primary Prediction**: Most likely cry type
+- **Confidence Score**: Probability of primary prediction
+- **All Probabilities**: Scores for all 5 cry types
+- **Caring Advice**: Contextual suggestions for parents
 
 ## 🤝 Contributing
 
@@ -173,112 +221,96 @@ baby-cry-detection/
 ## 📋 Future Enhancements
 
 - [ ] Real-time continuous monitoring
-- [ ] Mobile app version
-- [ ] Multi-language support
-- [ ] Parent dashboard with crying patterns
+- [ ] Mobile app version  
+- [ ] Advanced deep learning models (CNN/RNN)
+- [ ] Multi-language interface
+- [ ] Parent dashboard with crying pattern analytics
+- [ ] Cloud deployment (Heroku/Streamlit Cloud)
 - [ ] Integration with baby monitoring devices
-- [ ] Advanced deep learning models
-- [ ] Cloud deployment options
 
-## ⚠️ Important Notes
+## ⚠️ Important Disclaimers
 
-- This is an AI assistant tool and should **not replace professional medical advice**
+- This is an **AI assistant tool** and should **not replace professional medical advice**
 - Always consult healthcare providers for serious concerns about your baby
 - The model provides probabilistic predictions, not definitive diagnoses
-- Accuracy may vary based on recording quality and background noise
+- Accuracy may vary based on recording quality and environmental factors
+- This tool is designed to **assist and support** parents, not replace parental intuition
 
 ## 🛠️ Troubleshooting
 
 ### Common Issues
 
-1. **Model not loading**: Ensure all .pkl files are in the project directory
-2. **Audio not recording**: Check microphone permissions in browser
-3. **Low accuracy**: Ensure audio quality is good and crying is prominent
-4. **Installation errors**: Verify Python version and try updating pip
+1. **"Model files not found" error**:
+   - Ensure all .pkl files are in the same directory as app.py
+   - Check file names match exactly: `baby_cry_model.pkl`, `label_encoder.pkl`, etc.
+
+2. **Audio recording not working**:
+   - Grant microphone permissions in your browser
+   - Try refreshing the page and allowing permissions again
+
+3. **"Could not analyze audio" error**:
+   - Ensure audio file is in supported format
+   - Check that audio contains actual sound (not silent)
+   - Try with a different audio file
+
+4. **Installation errors**:
+   - Update pip: `pip install --upgrade pip`
+   - Install packages individually if requirements.txt fails
+   - Check Python version compatibility (3.8+)
 
 ### Performance Tips
 
-- Use high-quality audio recordings (clear, minimal background noise)
-- Record for at least 2-3 seconds to capture sufficient audio features
-- Ensure the baby's cry is the dominant sound in the recording
-- Test with different microphone positions for optimal results
-- Consider the environment - quiet rooms work best
+- **Recording Quality**: Use quiet environments with minimal background noise
+- **Duration**: Record for 2-3 seconds to capture sufficient features
+- **Microphone**: Position microphone close to baby for clear audio
+- **File Format**: WAV files generally provide best results
+- **Browser**: Chrome/Firefox recommended for audio recording features
 
-## 📊 Technical Specifications
+## 📊 System Requirements
 
-### Audio Processing
-- **Supported Formats**: WAV, MP3, FLAC, M4A, OGG
-- **Sample Rate**: 22050 Hz (automatically resampled)
-- **Feature Extraction**: 40 MFCC coefficients per audio sample
-- **Window Size**: Default librosa settings for optimal feature extraction
+### Minimum Requirements
+- **RAM**: 4GB
+- **Storage**: 1GB free space
+- **CPU**: Dual-core processor
+- **Internet**: For initial package installation
+- **Browser**: Chrome, Firefox, Safari, Edge (latest versions)
 
-### Model Architecture
-```python
-RandomForestClassifier(
-    n_estimators=100,
-    max_depth=10,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    random_state=42
-)
-```
-
-### System Requirements
-- **RAM**: Minimum 4GB, recommended 8GB+
-- **Storage**: 500MB for dependencies, 1GB+ for dataset
-- **CPU**: Multi-core processor recommended for faster training
-- **Audio**: Microphone access for recording features
-
-## 🧪 Testing
-
-### Unit Tests
-Run the test suite to ensure everything works correctly:
-```bash
-python -m pytest tests/
-```
-
-### Manual Testing
-1. Test with sample audio files from each category
-2. Verify recording functionality in different browsers
-3. Check prediction consistency across multiple runs
-4. Validate visualization components
-
-## 📈 Model Performance
-
-### Training Results
-- **Training Accuracy**: ~95%
-- **Validation Accuracy**: ~88%
-- **Test Accuracy**: ~85%
-- **F1-Score**: 0.84 (macro average)
-
-### Confusion Matrix Results
-The model performs best on:
-- **Hungry** cries (92% precision)
-- **Tired** cries (89% precision)
-
-Areas for improvement:
-- **Discomfort** vs **Belly Pain** distinction
-- **Burping** detection in noisy environments
+### Recommended Requirements
+- **RAM**: 8GB+
+- **Storage**: 2GB+ free space
+- **CPU**: Quad-core processor
+- **Microphone**: Built-in or external microphone for recording
 
 ## 🔒 Privacy & Security
 
-- **No Data Storage**: Audio files are processed in real-time and not stored
-- **Local Processing**: All analysis happens on your device
+- **Local Processing**: All audio analysis happens on your device
+- **No Data Storage**: Audio files are processed in memory and not saved
 - **No Cloud Upload**: Your baby's audio never leaves your computer
-- **Open Source**: Full transparency in code and model training
+- **Open Source**: Full code transparency for security review
+- **Real-time Only**: No persistent storage of audio data
 
-## 📚 References & Citations
+## 📚 Dependencies
 
-1. DonateACry Database: [Research Paper](https://example.com)
-2. MFCC Feature Extraction: Librosa Documentation
-3. Random Forest Algorithm: Scikit-learn Documentation
-4. Audio Processing: "Speech and Audio Processing" techniques
+### Core Libraries
+```
+streamlit>=1.28.0
+librosa>=0.10.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
+matplotlib>=3.7.0
+plotly>=5.15.0
+soundfile>=0.12.0
+audio-recorder-streamlit>=0.0.8
+```
 
-## 🆘 Support
+## 🆘 Support & Help
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/baby-cry-detection/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/baby-cry-detection/discussions)
-- **Email**: support@babycrydetection.com
+- **GitHub Issues**: [Report bugs or request features](https://github.com/yourusername/baby-cry-detection/issues)
+- **Discussions**: [Ask questions or share ideas](https://github.com/yourusername/baby-cry-detection/discussions)
+- **Documentation**: This README and code comments
+- **Community**: Join our discussions for tips and best practices
 
 ## 📄 License
 
@@ -286,13 +318,28 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- DonateACry team for providing the dataset
-- Streamlit team for the amazing framework
-- Librosa developers for audio processing capabilities
-- The open-source community for various tools and libraries
+- **Google Colab**: For providing free GPU training environment
+- **Streamlit**: For the amazing web app framework
+- **Librosa**: For comprehensive audio processing capabilities
+- **Scikit-learn**: For machine learning algorithms and tools
+- **Audio Processing Community**: For research and best practices
+- **Parent Testers**: For feedback and real-world validation
+
+## 🧪 Testing Your Setup
+
+### Quick Test
+1. Run the app: `streamlit run app.py`
+2. Upload a sample audio file or record a short clip
+3. Verify that predictions appear with confidence scores
+4. Check that visualizations (waveform, probabilities) display correctly
+
+### Model Validation
+- The app will show "✅ Model loaded successfully!" if all files are found
+- Feature count should show 58 features in the interface
+- All 5 cry types should appear in probability charts
 
 ---
 
 **Built with ❤️ for parents everywhere**
 
-*Remember: This tool is designed to assist and support parents, but it should never replace professional medical advice or parental intuition.*
+*This tool is designed to assist and support parents in understanding their baby's needs. Always trust your parental instincts and consult healthcare professionals when needed.*

@@ -20,28 +20,77 @@ def load_model_files():
         model = joblib.load('baby_cry_model.pkl')
         label_encoder = joblib.load('label_encoder.pkl')
         feature_columns = joblib.load('feature_columns.pkl')
-        return model, label_encoder, feature_columns, True
+        
+        # Try to load scaler if it exists
+        scaler = None
+        try:
+            scaler = joblib.load('scaler.pkl')
+        except:
+            pass  # Scaler might not exist
+            
+        return model, label_encoder, feature_columns, scaler, True
     except Exception as e:
         st.error(f"Error loading model: {e}")
-        return None, None, None, False
+        return None, None, None, None, False
 
 class BabyCryDetector:
     def __init__(self):
-        self.model, self.label_encoder, self.feature_columns, self.model_loaded = load_model_files()
+        self.model, self.label_encoder, self.feature_columns, self.scaler, self.model_loaded = load_model_files()
     
-    def extract_features(self, audio_data, sample_rate):
-        """Extract MFCC features from audio data"""
+    def enhanced_features_extractor(self, audio_data, sample_rate):
+        """Extract enhanced features from audio - same as training"""
         try:
-            # Ensure audio is not too short
-            if len(audio_data) < sample_rate * 0.5:  # At least 0.5 seconds
-                # Pad with zeros if too short
-                audio_data = np.pad(audio_data, (0, int(sample_rate * 0.5) - len(audio_data)))
+            # If audio is too short, pad it
+            if len(audio_data) < sample_rate:
+                audio_data = np.pad(audio_data, (0, sample_rate - len(audio_data)), mode='constant')
             
-            # Extract MFCC features
-            mfccs_features = librosa.feature.mfcc(y=audio_data, sr=sample_rate, n_mfcc=40)
-            mfccs_scaled_features = np.mean(mfccs_features.T, axis=0)
+            # If audio is too long, take first 3 seconds
+            if len(audio_data) > sample_rate * 5:
+                audio_data = audio_data[:sample_rate * 3]
             
-            return mfccs_scaled_features
+            features = []
+            
+            # 1. MFCC features (most important for speech/cry recognition)
+            mfccs = librosa.feature.mfcc(y=audio_data, sr=sample_rate, n_mfcc=13)
+            mfccs_mean = np.mean(mfccs, axis=1)
+            mfccs_std = np.std(mfccs, axis=1)
+            features.extend(mfccs_mean)
+            features.extend(mfccs_std)
+            
+            # 2. Spectral features
+            spectral_centroids = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
+            features.append(np.mean(spectral_centroids))
+            features.append(np.std(spectral_centroids))
+            
+            spectral_rolloff = librosa.feature.spectral_rolloff(y=audio_data, sr=sample_rate)[0]
+            features.append(np.mean(spectral_rolloff))
+            features.append(np.std(spectral_rolloff))
+            
+            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=audio_data, sr=sample_rate)[0]
+            features.append(np.mean(spectral_bandwidth))
+            features.append(np.std(spectral_bandwidth))
+            
+            # 3. Zero crossing rate
+            zcr = librosa.feature.zero_crossing_rate(audio_data)[0]
+            features.append(np.mean(zcr))
+            features.append(np.std(zcr))
+            
+            # 4. Root Mean Square Energy
+            rms = librosa.feature.rms(y=audio_data)[0]
+            features.append(np.mean(rms))
+            features.append(np.std(rms))
+            
+            # 5. Chroma features
+            chroma = librosa.feature.chroma_stft(y=audio_data, sr=sample_rate)
+            features.extend(np.mean(chroma, axis=1))
+            
+            # 6. Mel-scale spectrogram
+            mel_spectrogram = librosa.feature.melspectrogram(y=audio_data, sr=sample_rate)
+            mel_features = np.mean(mel_spectrogram, axis=1)
+            features.extend(mel_features[:10])  # Take first 10 mel features
+            
+            return np.array(features)
+            
         except Exception as e:
             st.error(f"Error extracting features: {e}")
             return None
@@ -51,9 +100,21 @@ class BabyCryDetector:
         if not self.model_loaded or self.model is None:
             return None, None, None
         
-        features = self.extract_features(audio_data, sample_rate)
+        # Use the enhanced feature extractor (same as training)
+        features = self.enhanced_features_extractor(audio_data, sample_rate)
+        
         if features is not None:
+            # Create DataFrame with proper column names
             features_df = pd.DataFrame([features], columns=self.feature_columns)
+            
+            # Apply scaling if scaler exists
+            if self.scaler is not None:
+                features_df = pd.DataFrame(
+                    self.scaler.transform(features_df), 
+                    columns=self.feature_columns
+                )
+            
+            # Make prediction
             prediction = self.model.predict(features_df)[0]
             probabilities = self.model.predict_proba(features_df)[0]
             
@@ -156,6 +217,9 @@ def main():
         
         st.success("✅ Model loaded successfully!")
         
+        # Display model info
+        st.info(f"Model expects {len(detector.feature_columns)} features")
+        
     except Exception as e:
         st.error(f"❌ Error initializing detector: {e}")
         return
@@ -181,11 +245,14 @@ def main():
             
             if uploaded_file is not None:
                 try:
-                    # Load audio file
-                    audio_data, sample_rate = librosa.load(uploaded_file, sr=None)
+                    # Load audio file with consistent sample rate
+                    audio_data, sample_rate = librosa.load(uploaded_file, sr=22050)
                     
                     # Display audio player
                     st.audio(uploaded_file, format='audio/wav')
+                    
+                    # Display audio info
+                    st.info(f"Audio loaded: {len(audio_data)/sample_rate:.2f} seconds, {sample_rate} Hz")
                     
                     # Plot waveform
                     fig_wave = plot_waveform(audio_data, sample_rate)
@@ -230,6 +297,7 @@ def main():
                 
                 except Exception as e:
                     st.error(f"Error processing audio file: {e}")
+                    st.error("Please check if the audio file is valid and try again.")
         
         elif input_method == "Record Audio":
             st.header("🎤 Record Audio")
@@ -252,6 +320,13 @@ def main():
                 try:
                     # Convert bytes to audio data
                     audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+                    
+                    # Ensure consistent sample rate
+                    if sample_rate != 22050:
+                        audio_data = librosa.resample(audio_data, orig_sr=sample_rate, target_sr=22050)
+                        sample_rate = 22050
+                    
+                    st.info(f"Recorded: {len(audio_data)/sample_rate:.2f} seconds")
                     
                     # Plot waveform
                     fig_wave = plot_waveform(audio_data, sample_rate)
@@ -301,7 +376,6 @@ def main():
             st.warning("⚠️ This feature requires microphone access and may consume more resources")
             
             # Placeholder for real-time analysis
-            # This would require more complex implementation with continuous audio streaming
             st.info("🚧 Real-time analysis feature is under development")
             st.markdown("""
             **Coming Soon:**
@@ -333,8 +407,8 @@ def main():
             st.header("🎯 Model Performance")
             st.markdown("""
             **Model Details:**
-            - Architecture: Random Forest
-            - Features: MFCC (40 coefficients)
+            - Architecture: Random Forest/Ensemble
+            - Features: Enhanced audio features (58 total)
             - Classes: 5 cry types
             - Accuracy: ~85-90%
             
